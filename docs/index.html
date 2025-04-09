@@ -1,146 +1,47 @@
+<!-- index.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Sports Data Portal</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f2f3f8;
-      padding: 20px;
-      color: #333;
-    }
-    h1 { color: #2c3e50; }
-    .hidden { display: none; }
-    .container { max-width: 500px; margin: auto; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    input, select, textarea {
-      width: 100%; padding: 10px; margin: 10px 0;
-      border-radius: 5px; border: 1px solid #ccc;
-    }
-    button {
-      padding: 10px 20px; background: #3498db; color: white; border: none;
-      border-radius: 5px; cursor: pointer;
-    }
-    button:hover { background: #2980b9; }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sports Portal</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Sports Tournament Portal</h1>
+  <h1>Sports Tournament Portal</h1>
 
-    <div id="auth">
-      <h2>Sign In</h2>
-      <select id="userType">
-        <option value="admin">Admin</option>
-        <option value="member">Member</option>
-      </select>
-      <input type="text" id="username" placeholder="Username" />
-      <input type="password" id="password" placeholder="Password" />
-      <button onclick="login()">Login</button>
-      <p>Don't have an account? <a href="#" onclick="showSignup()">Sign Up</a></p>
-    </div>
-
-    <div id="signup" class="hidden">
-      <h2>Sign Up</h2>
-      <select id="signupType">
-        <option value="member">Member</option>
-        <option value="admin">Admin</option>
-      </select>
-      <input type="text" id="signupUsername" placeholder="Username" />
-      <input type="password" id="signupPassword" placeholder="Password" />
-      <button onclick="signup()">Register</button>
-      <p>Already have an account? <a href="#" onclick="showLogin()">Login</a></p>
-    </div>
-
-    <div id="admin-dashboard" class="hidden">
-      <h2>Admin Dashboard</h2>
-      <button onclick="logout()">Logout</button>
-      <textarea id="matchData" placeholder="Enter match/player data..."></textarea>
-      <button onclick="uploadMatchData()">Submit Data</button>
-    </div>
-
-    <div id="member-dashboard" class="hidden">
-      <h2>Member Dashboard</h2>
-      <button onclick="logout()">Logout</button>
-      <div id="matchInfo"></div>
-      <div id="leaderboard"></div>
-    </div>
+  <div id="signup-form">
+    <h2>Sign Up</h2>
+    <input type="text" id="signup-username" placeholder="Username"><br>
+    <input type="password" id="signup-password" placeholder="Password"><br>
+    <select id="signup-role">
+      <option value="admin">Admin</option>
+      <option value="member">Member</option>
+    </select><br>
+    <button onclick="signup()">Sign Up</button>
   </div>
 
-  <script>
-    function showSignup() {
-      document.getElementById('auth').classList.add('hidden');
-      document.getElementById('signup').classList.remove('hidden');
-    }
+  <div id="login-form">
+    <h2>Login</h2>
+    <input type="text" id="login-username" placeholder="Username"><br>
+    <input type="password" id="login-password" placeholder="Password"><br>
+    <button onclick="login()">Login</button>
+  </div>
 
-    function showLogin() {
-      document.getElementById('signup').classList.add('hidden');
-      document.getElementById('auth').classList.remove('hidden');
-    }
+  <div id="admin-dashboard" class="hidden">
+    <h2>Admin Dashboard</h2>
+    <textarea id="matchData" placeholder="Enter match/player data..."></textarea><br>
+    <button onclick="uploadMatchData()">Submit Data</button>
+    <button onclick="logout()">Logout</button>
+  </div>
 
-    function login() {
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-      const type = document.getElementById('userType').value;
+  <div id="member-dashboard" class="hidden">
+    <h2>Player Dashboard</h2>
+    <div id="matchInfo"></div>
+    <div id="leaderboard"></div>
+    <button onclick="logout()">Logout</button>
+  </div>
 
-      fetch('/login', {
-        method: 'POST',
-        body: JSON.stringify({ username, password, type }),
-        headers: { 'Content-Type': 'application/json' }
-      }).then(res => res.json()).then(data => {
-        if (data.success) {
-          document.getElementById('auth').classList.add('hidden');
-          if (type === 'admin') {
-            document.getElementById('admin-dashboard').classList.remove('hidden');
-          } else {
-            document.getElementById('member-dashboard').classList.remove('hidden');
-            loadMatchInfo();
-          }
-        } else {
-          alert('Login failed');
-        }
-      });
-    }
-
-    function signup() {
-      const username = document.getElementById('signupUsername').value;
-      const password = document.getElementById('signupPassword').value;
-      const type = document.getElementById('signupType').value;
-
-      fetch('/signup', {
-        method: 'POST',
-        body: JSON.stringify({ username, password, type }),
-        headers: { 'Content-Type': 'application/json' }
-      }).then(res => res.text()).then(data => {
-        alert(data);
-        showLogin();
-      });
-    }
-
-    function uploadMatchData() {
-      const data = document.getElementById('matchData').value;
-      fetch('/upload', {
-        method: 'POST',
-        body: data,
-        headers: { 'Content-Type': 'text/plain' }
-      }).then(res => alert("Data submitted."));
-    }
-
-    function loadMatchInfo() {
-      fetch('/matchinfo')
-        .then(res => res.text())
-        .then(data => {
-          document.getElementById('matchInfo').innerText = data;
-        });
-      fetch('/leaderboard')
-        .then(res => res.text())
-        .then(data => {
-          document.getElementById('leaderboard').innerText = data;
-        });
-    }
-
-    function logout() {
-      location.reload();
-    }
-  </script>
+  <script src="script.js"></script>
 </body>
 </html>
