@@ -3,88 +3,185 @@
 <head>
   <title>Sports Data Portal</title>
   <style>
-    body { font-family: Arial; padding: 20px; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #1f4037, #99f2c8);
+      margin: 0;
+      padding: 0;
+      color: #fff;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: 40px auto;
+      background: rgba(0,0,0,0.6);
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    h1, h2 {
+      text-align: center;
+    }
+
+    input, select, textarea, button {
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      font-size: 16px;
+    }
+
+    button {
+      background: #00c6ff;
+      color: white;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+
     .hidden { display: none; }
+
+    .social-login button {
+      width: 48%;
+      margin: 5px 1%;
+      background-color: #4267B2; /* Facebook */
+    }
+
+    .social-login .google {
+      background-color: #DB4437; /* Google */
+    }
   </style>
 </head>
 <body>
+
+<div class="container" id="login-form">
   <h1>Sports Tournament Portal</h1>
 
-  <div id="login-form">
-    <h2>Login</h2>
-    <select id="userType">
-      <option value="admin">Admin</option>
-      <option value="member">Member</option>
-    </select><br><br>
-    <input type="text" id="email" placeholder="Email" /><br><br>
-    <input type="password" id="password" placeholder="Password" /><br><br>
-    <button onclick="login()">Login</button>
+  <h2>Sign In</h2>
+  <select id="userType">
+    <option value="admin">Admin</option>
+    <option value="member">Member</option>
+  </select>
+  <input type="text" id="username" placeholder="Username" />
+  <input type="password" id="password" placeholder="Password" />
+  <button onclick="login()">Login</button>
+
+  <div class="social-login">
+    <button class="google" onclick="loginWithGoogle()">Login with Google</button>
+    <button onclick="loginWithFacebook()">Login with Facebook</button>
   </div>
 
-  <div id="admin-dashboard" class="hidden">
-    <h2>Admin Dashboard</h2>
-    <button onclick="logout()">Logout</button><br><br>
-    <textarea id="matchData" placeholder="Enter match/player data..."></textarea><br>
-    <button onclick="uploadMatchData()">Submit Data</button>
-  </div>
+  <p style="text-align: center;">Don't have an account? <a href="#" onclick="showSignup()">Sign up</a></p>
+</div>
 
-  <div id="member-dashboard" class="hidden">
-    <h2>Player Dashboard</h2>
-    <button onclick="logout()">Logout</button>
-    <div id="matchInfo"></div>
-    <div id="leaderboard"></div>
-  </div>
+<div class="container hidden" id="signup-form">
+  <h2>Create Account</h2>
+  <input type="text" id="newUsername" placeholder="Choose Username" />
+  <input type="password" id="newPassword" placeholder="Choose Password" />
+  <button onclick="manualSignup()">Sign Up</button>
+  <p style="text-align: center;"><a href="#" onclick="showLogin()">Back to login</a></p>
+</div>
 
-  <script>
-    function login() {
-      const type = document.getElementById('userType').value;
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
+<div class="container hidden" id="admin-dashboard">
+  <h2>Admin Dashboard</h2>
+  <button onclick="logout()">Logout</button>
+  <textarea id="matchData" placeholder="Enter match/player data..."></textarea>
+  <button onclick="uploadMatchData()">Submit Data</button>
+</div>
 
-      fetch('/login', {
-        method: 'POST',
-        body: JSON.stringify({ type, username, password }),
-        headers: { 'Content-Type': 'application/json' }
-      }).then(res => res.json()).then(data => {
-        if (data.success) {
-          document.getElementById('login-form').classList.add('hidden');
-          if (type === 'admin') {
-            document.getElementById('admin-dashboard').classList.remove('hidden');
-          } else {
-            document.getElementById('member-dashboard').classList.remove('hidden');
-            loadMatchInfo();
-          }
+<div class="container hidden" id="member-dashboard">
+  <h2>Player Dashboard</h2>
+  <button onclick="logout()">Logout</button>
+  <div id="matchInfo"></div>
+  <div id="leaderboard"></div>
+</div>
+
+<script>
+  function showSignup() {
+    document.getElementById('login-form').classList.add('hidden');
+    document.getElementById('signup-form').classList.remove('hidden');
+  }
+
+  function showLogin() {
+    document.getElementById('signup-form').classList.add('hidden');
+    document.getElementById('login-form').classList.remove('hidden');
+  }
+
+  function login() {
+    const type = document.getElementById('userType').value;
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    fetch('/login', {
+      method: 'POST',
+      body: JSON.stringify({ type, username, password }),
+      headers: { 'Content-Type': 'application/json' }
+    }).then(res => res.json()).then(data => {
+      if (data.success) {
+        document.getElementById('login-form').classList.add('hidden');
+        if (type === 'admin') {
+          document.getElementById('admin-dashboard').classList.remove('hidden');
         } else {
-          alert('Login failed');
+          document.getElementById('member-dashboard').classList.remove('hidden');
+          loadMatchInfo();
         }
-      });
-    }
+      } else {
+        alert('Login failed');
+      }
+    });
+  }
 
-    function uploadMatchData() {
-      const data = document.getElementById('matchData').value;
-      fetch('/upload', {
-        method: 'POST',
-        body: data,
-        headers: { 'Content-Type': 'text/plain' }
-      }).then(res => alert("Data submitted."));
-    }
+  function manualSignup() {
+    const username = document.getElementById('newUsername').value;
+    const password = document.getElementById('newPassword').value;
 
-    function loadMatchInfo() {
-      fetch('/matchinfo')
-        .then(res => res.text())
-        .then(data => {
-          document.getElementById('matchInfo').innerText = data;
-        });
-      fetch('/leaderboard')
-        .then(res => res.text())
-        .then(data => {
-          document.getElementById('leaderboard').innerText = data;
-        });
-    }
+    fetch('/signup', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+      headers: { 'Content-Type': 'application/json' }
+    }).then(res => res.json()).then(data => {
+      if (data.success) {
+        alert('Signup successful! Please log in.');
+        showLogin();
+      } else {
+        alert('Signup failed');
+      }
+    });
+  }
 
-    function logout() {
-      location.reload();
-    }
-  </script>
+  function loginWithGoogle() {
+    alert("OAuth integration with Google would go here.");
+    // Real implementation requires backend redirect to Google
+  }
+
+  function loginWithFacebook() {
+    alert("OAuth integration with Facebook would go here.");
+    // Real implementation requires backend redirect to Facebook
+  }
+
+  function uploadMatchData() {
+    const data = document.getElementById('matchData').value;
+    fetch('/upload', {
+      method: 'POST',
+      body: data,
+      headers: { 'Content-Type': 'text/plain' }
+    }).then(() => alert("Data submitted."));
+  }
+
+  function loadMatchInfo() {
+    fetch('/matchinfo').then(res => res.text()).then(data => {
+      document.getElementById('matchInfo').innerText = data;
+    });
+    fetch('/leaderboard').then(res => res.text()).then(data => {
+      document.getElementById('leaderboard').innerText = data;
+    });
+  }
+
+  function logout() {
+    location.reload();
+  }
+</script>
+
 </body>
 </html>
