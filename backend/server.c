@@ -1,89 +1,107 @@
+// server.c
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <netinet/in.h>
-#include <pthread.h>
+#include <string.h>
+#include "mongoose.h"
 
-void handle_client(int client) {
-    char buffer[4096];
-    read(client, buffer, sizeof(buffer));
-    
-    if (strstr(buffer, "POST /login")) {
-        char *body = strstr(buffer, "\r\n\r\n") + 4;
-        char username[100], password[100], type[20];
-        sscanf(body, "{\"username\":\"%[^\"]\",\"password\":\"%[^\"]\",\"type\":\"%[^\"]\"}", username, password, type);
+#define USERS_FILE "backend/users.txt"
+#define MATCH_FILE "backend/match_data.txt"
 
-        FILE *f = fopen("users.txt", "r");
-        int found = 0;
-        char line[256];
-        while (fgets(line, sizeof(line), f)) {
-            char u[100], p[100], t[20];
-            sscanf(line, "%[^,],%[^,],%s", u, p, t);
-            if (strcmp(u, username) == 0 && strcmp(p, password) == 0 && strcmp(t, type) == 0) {
-                found = 1;
-                break;
-            }
-        }
-        fclose(f);
-
-        dprintf(client, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n");
-        dprintf(client, "{\"success\": %s}", found ? "true" : "false");
-
-    } else if (strstr(buffer, "POST /signup")) {
-        char *body = strstr(buffer, "\r\n\r\n") + 4;
-        char username[100], password[100], type[20];
-        sscanf(body, "{\"username\":\"%[^\"]\",\"password\":\"%[^\"]\",\"type\":\"%[^\"]\"}", username, password, type);
-
-        FILE *f = fopen("users.txt", "a");
-        fprintf(f, "%s,%s,%s\n", username, password, type);
-        fclose(f);
-
-        dprintf(client, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nAccount created");
-
-    } else if (strstr(buffer, "POST /upload")) {
-        char *body = strstr(buffer, "\r\n\r\n") + 4;
-        FILE *f = fopen("matches.txt", "a");
-        fprintf(f, "%s\n", body);
-        fclose(f);
-        dprintf(client, "HTTP/1.1 200 OK\r\n\r\n");
-
-    } else if (strstr(buffer, "GET /matchinfo")) {
-        FILE *f = fopen("matches.txt", "r");
-        char content[2048] = "";
-        char line[256];
-        while (f && fgets(line, sizeof(line), f)) {
-            strcat(content, line);
-        }
-        if (f) fclose(f);
-        dprintf(client, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n%s", content);
-
-    } else if (strstr(buffer, "GET /leaderboard")) {
-        dprintf(client, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nLeaderboard functionality to be added.");
-    } else {
-        dprintf(client, "HTTP/1.1 404 Not Found\r\n\r\n");
-    }
-
-    close(client);
-}
+static void handle_request(struct mg_connection *c, int ev, void *ev_data, void *fn_data);
+void handle_signup(struct mg_connection *c, struct mg_http_message *hm);
+void handle_login(struct mg_connection *c, struct mg_http_message *hm);
+void handle_upload(struct mg_connection *c, struct mg_http_message *hm);
+void handle_static_get(struct mg_connection *c, struct mg_http_message *hm);
+void handle_text_get(struct mg_connection *c, struct mg_http_message *hm);
 
 int main() {
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in addr = {0};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(8080);
-    addr.sin_addr.s_addr = INADDR_ANY;
+  struct mg_mgr mgr;
+  mg_mgr_init(&mgr);
+  printf("Starting server on http://localhost:8080\n");
+  mg_http_listen(&mgr, "http://localhost:8080", handle_request, &mgr);
+  for (;;) mg_mgr_poll(&mgr, 1000);
+  mg_mgr_free(&mgr);
+  return 0;
+}
 
-    bind(sockfd, (struct sockaddr*)&addr, sizeof(addr));
-    listen(sockfd, 10);
-    printf("Server running on port 8080...\n");
+static void handle_request(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
+  if (ev == MG_EV_HTTP_MSG) {
+    struct mg_http_message *hm = (struct mg_http_message *) ev_data;
 
-    while (1) {
-        int client = accept(sockfd, NULL, NULL);
-        pthread_t t;
-        pthread_create(&t, NULL, (void *)handle_client, (void *)(intptr_t)client);
-        pthread_detach(t);
+    if (mg_http_match_uri(hm, "/signup")) {
+      handle_signup(c, hm);
+    } else if (mg_http_match_uri(hm, "/login")) {
+      handle_login(c, hm);
+    } else if (mg_http_match_uri(hm, "/upload")) {
+      handle_upload(c, hm);
+    } else if (mg_http_match_uri(hm, "/matchinfo") || mg_http_match_uri(hm, "/leaderboard")) {
+      handle_text_get(c, hm);
+    } else {
+      handle_static_get(c, hm);
     }
+  }
+}
 
-    return 0;
+void handle_signup(struct mg_connection *c, struct mg_http_message *hm) {
+  char username[100], password[100], role[20];
+  struct json_token t;
+  json_scanf(hm->body.ptr, hm->body.len,
+             "{username: %Q, password: %Q, role: %Q}",
+             &username, &password, &role);
+
+  FILE *fp = fopen(USERS_FILE, "a");
+  fprintf(fp, "%s,%s,%s\n", username, password, role);
+  fclose(fp);
+
+  mg_http_reply(c, 200, "Content-Type: application/json\r\n", "{\"message\":\"Signup successful\"}");
+}
+
+void handle_login(struct mg_connection *c, struct mg_http_message *hm) {
+  char username[100], password[100], file_user[100], file_pass[100], file_role[20];
+  int found = 0;
+  json_scanf(hm->body.ptr, hm->body.len, "{username: %Q, password: %Q}", &username, &password);
+
+  FILE *fp = fopen(USERS_FILE, "r");
+  while (fscanf(fp, "%99[^,],%99[^,],%19[^\n]\n", file_user, file_pass, file_role) == 3) {
+    if (strcmp(file_user, username) == 0 && strcmp(file_pass, password) == 0) {
+      found = 1;
+      break;
+    }
+  }
+  fclose(fp);
+
+  if (found) {
+    mg_http_reply(c, 200, "Content-Type: application/json\r\n",
+      "{\"success\":true,\"role\":\"%s\"}", file_role);
+  } else {
+    mg_http_reply(c, 200, "Content-Type: application/json\r\n",
+      "{\"success\":false,\"message\":\"Invalid credentials\"}");
+  }
+}
+
+void handle_upload(struct mg_connection *c, struct mg_http_message *hm) {
+  FILE *fp = fopen(MATCH_FILE, "a");
+  fwrite(hm->body.ptr, 1, hm->body.len, fp);
+  fwrite("\n", 1, 1, fp);
+  fclose(fp);
+  mg_http_reply(c, 200, "", "Data received\n");
+}
+
+void handle_text_get(struct mg_connection *c, struct mg_http_message *hm) {
+  const char *file = MATCH_FILE;
+  FILE *fp = fopen(file, "r");
+  fseek(fp, 0, SEEK_END);
+  long fsize = ftell(fp);
+  fseek(fp, 0, SEEK_SET);
+  char *data = malloc(fsize + 1);
+  fread(data, 1, fsize, fp);
+  data[fsize] = '\0';
+  fclose(fp);
+  mg_http_reply(c, 200, "Content-Type: text/plain\r\n", "%s", data);
+  free(data);
+}
+
+void handle_static_get(struct mg_connection *c, struct mg_http_message *hm) {
+  struct mg_http_serve_opts opts = {.root_dir = "frontend"};
+  mg_http_serve_dir(c, hm, &opts);
 }
