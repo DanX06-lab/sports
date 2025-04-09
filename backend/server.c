@@ -1,154 +1,88 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <pthread.h>
 
-#define PORT 8080
-#define BUF_SIZE 8192
-#define USER_FILE "users.txt"
+void handle_client(int client) {
+    char buffer[4096];
+    read(client, buffer, sizeof(buffer));
+    
+    if (strstr(buffer, "POST /login")) {
+        char *body = strstr(buffer, "\r\n\r\n") + 4;
+        char username[100], password[100], type[20];
+        sscanf(body, "{\"username\":\"%[^\"]\",\"password\":\"%[^\"]\",\"type\":\"%[^\"]\"}", username, password, type);
 
-void trim_newline(char *str) {
-    char *pos;
-    if ((pos=strchr(str, '\n')) != NULL)
-        *pos = '\0';
-}
-
-int user_exists(const char *username) {
-    FILE *fp = fopen(USER_FILE, "r");
-    if (!fp) return 0;
-
-    char line[256];
-    while (fgets(line, sizeof(line), fp)) {
-        trim_newline(line);
-        char *saved_username = strtok(line, ",");
-        if (saved_username && strcmp(saved_username, username) == 0) {
-            fclose(fp);
-            return 1;
-        }
-    }
-    fclose(fp);
-    return 0;
-}
-
-int verify_login(const char *username, const char *password, const char *type) {
-    FILE *fp = fopen(USER_FILE, "r");
-    if (!fp) return 0;
-
-    char line[256];
-    while (fgets(line, sizeof(line), fp)) {
-        trim_newline(line);
-        char *saved_username = strtok(line, ",");
-        char *saved_password = strtok(NULL, ",");
-        char *saved_type     = strtok(NULL, ",");
-        if (saved_username && saved_password && saved_type &&
-            strcmp(saved_username, username) == 0 &&
-            strcmp(saved_password, password) == 0 &&
-            strcmp(saved_type, type) == 0) {
-            fclose(fp);
-            return 1;
-        }
-    }
-    fclose(fp);
-    return 0;
-}
-
-void handle_request(int client_socket, char *request) {
-    if (strstr(request, "POST /signup")) {
-        char *body = strstr(request, "\r\n\r\n");
-        if (body) {
-            body += 4;
-            char username[100], password[100];
-            sscanf(body, "{\"username\":\"%[^\"]\",\"password\":\"%[^\"]\"}", username, password);
-
-            if (user_exists(username)) {
-                char response[] = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"success\":false}";
-                write(client_socket, response, strlen(response));
-            } else {
-                FILE *fp = fopen(USER_FILE, "a");
-                fprintf(fp, "%s,%s,member\n", username, password);
-                fclose(fp);
-                char response[] = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"success\":true}";
-                write(client_socket, response, strlen(response));
+        FILE *f = fopen("users.txt", "r");
+        int found = 0;
+        char line[256];
+        while (fgets(line, sizeof(line), f)) {
+            char u[100], p[100], t[20];
+            sscanf(line, "%[^,],%[^,],%s", u, p, t);
+            if (strcmp(u, username) == 0 && strcmp(p, password) == 0 && strcmp(t, type) == 0) {
+                found = 1;
+                break;
             }
         }
-    }
+        fclose(f);
 
-    else if (strstr(request, "POST /login")) {
-        char *body = strstr(request, "\r\n\r\n");
-        if (body) {
-            body += 4;
-            char username[100], password[100], type[100];
+        dprintf(client, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n");
+        dprintf(client, "{\"success\": %s}", found ? "true" : "false");
 
-            sscanf(body,
-              "{\"type\":\"%[^\"]\",\"username\":\"%[^\"]\",\"password\":\"%[^\"]\"}",
-              type, username, password
-            );
+    } else if (strstr(buffer, "POST /signup")) {
+        char *body = strstr(buffer, "\r\n\r\n") + 4;
+        char username[100], password[100], type[20];
+        sscanf(body, "{\"username\":\"%[^\"]\",\"password\":\"%[^\"]\",\"type\":\"%[^\"]\"}", username, password, type);
 
-            if (verify_login(username, password, type)) {
-                char response[] = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"success\":true}";
-                write(client_socket, response, strlen(response));
-            } else {
-                char response[] = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"success\":false}";
-                write(client_socket, response, strlen(response));
-            }
+        FILE *f = fopen("users.txt", "a");
+        fprintf(f, "%s,%s,%s\n", username, password, type);
+        fclose(f);
+
+        dprintf(client, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nAccount created");
+
+    } else if (strstr(buffer, "POST /upload")) {
+        char *body = strstr(buffer, "\r\n\r\n") + 4;
+        FILE *f = fopen("matches.txt", "a");
+        fprintf(f, "%s\n", body);
+        fclose(f);
+        dprintf(client, "HTTP/1.1 200 OK\r\n\r\n");
+
+    } else if (strstr(buffer, "GET /matchinfo")) {
+        FILE *f = fopen("matches.txt", "r");
+        char content[2048] = "";
+        char line[256];
+        while (f && fgets(line, sizeof(line), f)) {
+            strcat(content, line);
         }
+        if (f) fclose(f);
+        dprintf(client, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n%s", content);
+
+    } else if (strstr(buffer, "GET /leaderboard")) {
+        dprintf(client, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nLeaderboard functionality to be added.");
+    } else {
+        dprintf(client, "HTTP/1.1 404 Not Found\r\n\r\n");
     }
 
-    else if (strstr(request, "POST /upload")) {
-        FILE *fp = fopen("match_data.txt", "a");
-        char *body = strstr(request, "\r\n\r\n");
-        if (body) {
-            body += 4;
-            fprintf(fp, "%s\n", body);
-        }
-        fclose(fp);
-        char response[] = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nData received.";
-        write(client_socket, response, strlen(response));
-    }
-
-    else if (strstr(request, "GET /matchinfo")) {
-        char response[] = 
-            "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nMatch 1: A vs B\nMatch 2: C vs D";
-        write(client_socket, response, strlen(response));
-    }
-
-    else if (strstr(request, "GET /leaderboard")) {
-        char response[] = 
-            "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n1. Player A - 10 pts\n2. Player C - 8 pts";
-        write(client_socket, response, strlen(response));
-    }
-
-    else {
-        char response[] = 
-            "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot Found";
-        write(client_socket, response, strlen(response));
-    }
-
-    close(client_socket);
+    close(client);
 }
 
 int main() {
-    int server_fd, client_socket;
-    struct sockaddr_in address;
-    int addrlen = sizeof(address);
-    char buffer[BUF_SIZE];
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(8080);
+    addr.sin_addr.s_addr = INADDR_ANY;
 
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
-
-    bind(server_fd, (struct sockaddr*)&address, sizeof(address));
-    listen(server_fd, 10);
-
-    printf("🟢 Server running at http://localhost:%d\n", PORT);
+    bind(sockfd, (struct sockaddr*)&addr, sizeof(addr));
+    listen(sockfd, 10);
+    printf("Server running on port 8080...\n");
 
     while (1) {
-        client_socket = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addrlen);
-        memset(buffer, 0, BUF_SIZE);
-        read(client_socket, buffer, BUF_SIZE - 1);
-        handle_request(client_socket, buffer);
+        int client = accept(sockfd, NULL, NULL);
+        pthread_t t;
+        pthread_create(&t, NULL, (void *)handle_client, (void *)(intptr_t)client);
+        pthread_detach(t);
     }
 
     return 0;
