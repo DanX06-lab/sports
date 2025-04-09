@@ -4,184 +4,143 @@
   <title>Sports Data Portal</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(to right, #1f4037, #99f2c8);
-      margin: 0;
-      padding: 0;
-      color: #fff;
+      font-family: Arial, sans-serif;
+      background: #f2f3f8;
+      padding: 20px;
+      color: #333;
     }
-
-    .container {
-      max-width: 500px;
-      margin: 40px auto;
-      background: rgba(0,0,0,0.6);
-      padding: 30px;
-      border-radius: 15px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
-
-    h1, h2 {
-      text-align: center;
-    }
-
-    input, select, textarea, button {
-      width: 100%;
-      margin-top: 10px;
-      padding: 10px;
-      border-radius: 10px;
-      border: none;
-      font-size: 16px;
-    }
-
-    button {
-      background: #00c6ff;
-      color: white;
-      cursor: pointer;
-      margin-top: 20px;
-    }
-
+    h1 { color: #2c3e50; }
     .hidden { display: none; }
-
-    .social-login button {
-      width: 48%;
-      margin: 5px 1%;
-      background-color: #4267B2; /* Facebook */
+    .container { max-width: 500px; margin: auto; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    input, select, textarea {
+      width: 100%; padding: 10px; margin: 10px 0;
+      border-radius: 5px; border: 1px solid #ccc;
     }
-
-    .social-login .google {
-      background-color: #DB4437; /* Google */
+    button {
+      padding: 10px 20px; background: #3498db; color: white; border: none;
+      border-radius: 5px; cursor: pointer;
     }
+    button:hover { background: #2980b9; }
   </style>
 </head>
 <body>
+  <div class="container">
+    <h1>Sports Tournament Portal</h1>
 
-<div class="container" id="login-form">
-  <h1>Sports Tournament Portal</h1>
+    <div id="auth">
+      <h2>Sign In</h2>
+      <select id="userType">
+        <option value="admin">Admin</option>
+        <option value="member">Member</option>
+      </select>
+      <input type="text" id="username" placeholder="Username" />
+      <input type="password" id="password" placeholder="Password" />
+      <button onclick="login()">Login</button>
+      <p>Don't have an account? <a href="#" onclick="showSignup()">Sign Up</a></p>
+    </div>
 
-  <h2>Sign In</h2>
-  <select id="userType">
-    <option value="admin">Admin</option>
-    <option value="member">Member</option>
-  </select>
-  <input type="text" id="username" placeholder="Username" />
-  <input type="password" id="password" placeholder="Password" />
-  <button onclick="login()">Login</button>
+    <div id="signup" class="hidden">
+      <h2>Sign Up</h2>
+      <select id="signupType">
+        <option value="member">Member</option>
+        <option value="admin">Admin</option>
+      </select>
+      <input type="text" id="signupUsername" placeholder="Username" />
+      <input type="password" id="signupPassword" placeholder="Password" />
+      <button onclick="signup()">Register</button>
+      <p>Already have an account? <a href="#" onclick="showLogin()">Login</a></p>
+    </div>
 
-  <div class="social-login">
-    <button class="google" onclick="loginWithGoogle()">Login with Google</button>
-    <button onclick="loginWithFacebook()">Login with Facebook</button>
+    <div id="admin-dashboard" class="hidden">
+      <h2>Admin Dashboard</h2>
+      <button onclick="logout()">Logout</button>
+      <textarea id="matchData" placeholder="Enter match/player data..."></textarea>
+      <button onclick="uploadMatchData()">Submit Data</button>
+    </div>
+
+    <div id="member-dashboard" class="hidden">
+      <h2>Member Dashboard</h2>
+      <button onclick="logout()">Logout</button>
+      <div id="matchInfo"></div>
+      <div id="leaderboard"></div>
+    </div>
   </div>
 
-  <p style="text-align: center;">Don't have an account? <a href="#" onclick="showSignup()">Sign up</a></p>
-</div>
+  <script>
+    function showSignup() {
+      document.getElementById('auth').classList.add('hidden');
+      document.getElementById('signup').classList.remove('hidden');
+    }
 
-<div class="container hidden" id="signup-form">
-  <h2>Create Account</h2>
-  <input type="text" id="newUsername" placeholder="Choose Username" />
-  <input type="password" id="newPassword" placeholder="Choose Password" />
-  <button onclick="manualSignup()">Sign Up</button>
-  <p style="text-align: center;"><a href="#" onclick="showLogin()">Back to login</a></p>
-</div>
+    function showLogin() {
+      document.getElementById('signup').classList.add('hidden');
+      document.getElementById('auth').classList.remove('hidden');
+    }
 
-<div class="container hidden" id="admin-dashboard">
-  <h2>Admin Dashboard</h2>
-  <button onclick="logout()">Logout</button>
-  <textarea id="matchData" placeholder="Enter match/player data..."></textarea>
-  <button onclick="uploadMatchData()">Submit Data</button>
-</div>
+    function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const type = document.getElementById('userType').value;
 
-<div class="container hidden" id="member-dashboard">
-  <h2>Player Dashboard</h2>
-  <button onclick="logout()">Logout</button>
-  <div id="matchInfo"></div>
-  <div id="leaderboard"></div>
-</div>
-
-<script>
-  function showSignup() {
-    document.getElementById('login-form').classList.add('hidden');
-    document.getElementById('signup-form').classList.remove('hidden');
-  }
-
-  function showLogin() {
-    document.getElementById('signup-form').classList.add('hidden');
-    document.getElementById('login-form').classList.remove('hidden');
-  }
-
-  function login() {
-    const type = document.getElementById('userType').value;
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-
-    fetch('/login', {
-      method: 'POST',
-      body: JSON.stringify({ type, username, password }),
-      headers: { 'Content-Type': 'application/json' }
-    }).then(res => res.json()).then(data => {
-      if (data.success) {
-        document.getElementById('login-form').classList.add('hidden');
-        if (type === 'admin') {
-          document.getElementById('admin-dashboard').classList.remove('hidden');
+      fetch('/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password, type }),
+        headers: { 'Content-Type': 'application/json' }
+      }).then(res => res.json()).then(data => {
+        if (data.success) {
+          document.getElementById('auth').classList.add('hidden');
+          if (type === 'admin') {
+            document.getElementById('admin-dashboard').classList.remove('hidden');
+          } else {
+            document.getElementById('member-dashboard').classList.remove('hidden');
+            loadMatchInfo();
+          }
         } else {
-          document.getElementById('member-dashboard').classList.remove('hidden');
-          loadMatchInfo();
+          alert('Login failed');
         }
-      } else {
-        alert('Login failed');
-      }
-    });
-  }
+      });
+    }
 
-  function manualSignup() {
-    const username = document.getElementById('newUsername').value;
-    const password = document.getElementById('newPassword').value;
+    function signup() {
+      const username = document.getElementById('signupUsername').value;
+      const password = document.getElementById('signupPassword').value;
+      const type = document.getElementById('signupType').value;
 
-    fetch('/signup', {
-      method: 'POST',
-      body: JSON.stringify({ username, password }),
-      headers: { 'Content-Type': 'application/json' }
-    }).then(res => res.json()).then(data => {
-      if (data.success) {
-        alert('Signup successful! Please log in.');
+      fetch('/signup', {
+        method: 'POST',
+        body: JSON.stringify({ username, password, type }),
+        headers: { 'Content-Type': 'application/json' }
+      }).then(res => res.text()).then(data => {
+        alert(data);
         showLogin();
-      } else {
-        alert('Signup failed');
-      }
-    });
-  }
+      });
+    }
 
-  function loginWithGoogle() {
-    alert("OAuth integration with Google would go here.");
-    // Real implementation requires backend redirect to Google
-  }
+    function uploadMatchData() {
+      const data = document.getElementById('matchData').value;
+      fetch('/upload', {
+        method: 'POST',
+        body: data,
+        headers: { 'Content-Type': 'text/plain' }
+      }).then(res => alert("Data submitted."));
+    }
 
-  function loginWithFacebook() {
-    alert("OAuth integration with Facebook would go here.");
-    // Real implementation requires backend redirect to Facebook
-  }
+    function loadMatchInfo() {
+      fetch('/matchinfo')
+        .then(res => res.text())
+        .then(data => {
+          document.getElementById('matchInfo').innerText = data;
+        });
+      fetch('/leaderboard')
+        .then(res => res.text())
+        .then(data => {
+          document.getElementById('leaderboard').innerText = data;
+        });
+    }
 
-  function uploadMatchData() {
-    const data = document.getElementById('matchData').value;
-    fetch('/upload', {
-      method: 'POST',
-      body: data,
-      headers: { 'Content-Type': 'text/plain' }
-    }).then(() => alert("Data submitted."));
-  }
-
-  function loadMatchInfo() {
-    fetch('/matchinfo').then(res => res.text()).then(data => {
-      document.getElementById('matchInfo').innerText = data;
-    });
-    fetch('/leaderboard').then(res => res.text()).then(data => {
-      document.getElementById('leaderboard').innerText = data;
-    });
-  }
-
-  function logout() {
-    location.reload();
-  }
-</script>
-
+    function logout() {
+      location.reload();
+    }
+  </script>
 </body>
 </html>
