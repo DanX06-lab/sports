@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sports Data Portal</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Sports Tournament Portal</h1>
+
+  <div id="login-form">
+    <h2>Login</h2>
+    <select id="userType">
+      <option value="admin">Admin</option>
+      <option value="member">Member</option>
+    </select><br><br>
+    <input type="text" id="username" placeholder="Username" /><br><br>
+    <input type="password" id="password" placeholder="Password" /><br><br>
+    <button onclick="login()">Login</button>
+  </div>
+
+  <div id="admin-dashboard" class="hidden">
+    <h2>Admin Dashboard</h2>
+    <button onclick="logout()">Logout</button><br><br>
+    <textarea id="matchData" placeholder="Enter match/player data..."></textarea><br>
+    <button onclick="uploadMatchData()">Submit Data</button>
+  </div>
+
+  <div id="member-dashboard" class="hidden">
+    <h2>Player Dashboard</h2>
+    <button onclick="logout()">Logout</button>
+    <div id="matchInfo"></div>
+    <div id="leaderboard"></div>
+  </div>
+
+  <script>
+    function login() {
+      const type = document.getElementById('userType').value;
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      fetch('/login', {
+        method: 'POST',
+        body: JSON.stringify({ type, username, password }),
+        headers: { 'Content-Type': 'application/json' }
+      }).then(res => res.json()).then(data => {
+        if (data.success) {
+          document.getElementById('login-form').classList.add('hidden');
+          if (type === 'admin') {
+            document.getElementById('admin-dashboard').classList.remove('hidden');
+          } else {
+            document.getElementById('member-dashboard').classList.remove('hidden');
+            loadMatchInfo();
+          }
+        } else {
+          alert('Login failed');
+        }
+      });
+    }
+
+    function uploadMatchData() {
+      const data = document.getElementById('matchData').value;
+      fetch('/upload', {
+        method: 'POST',
+        body: data,
+        headers: { 'Content-Type': 'text/plain' }
+      }).then(res => alert("Data submitted."));
+    }
+
+    function loadMatchInfo() {
+      fetch('/matchinfo')
+        .then(res => res.text())
+        .then(data => {
+          document.getElementById('matchInfo').innerText = data;
+        });
+      fetch('/leaderboard')
+        .then(res => res.text())
+        .then(data => {
+          document.getElementById('leaderboard').innerText = data;
+        });
+    }
+
+    function logout() {
+      location.reload();
+    }
+  </script>
+</body>
+</html>
